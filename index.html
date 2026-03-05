@@ -345,16 +345,28 @@
             <h1>War Thunder Tier List</h1>
             <input
                 type="file"
-                id="importFile"
+                id="importTierlistFile"
                 accept=".json"
                 style="display: none"
             />
             <button
                 class="import-btn"
-                onclick="document.getElementById('importFile').click()"
+                onclick="document.getElementById('importTierlistFile').click()"
             >
-                Importer JSON
+                Importer Tierlist
             </button>
+            <button
+                class="import-btn"
+                onclick="exportTierlist()"
+            >
+                Exporter Tierlist
+            </button>
+            <input
+                type="file"
+                id="importFile"
+                accept=".json"
+                style="display: none"
+            />
             <span id="vehicleCountHeader" class="vehicle-count-header"></span>
         </div>
 
@@ -813,6 +825,74 @@
                                 updateVehicleCount();
                             } else {
                                 alert('Le fichier JSON doit contenir un tableau de véhicules');
+                            }
+                        } catch (err) {
+                            alert('Erreur lors de l\'import: ' + err.message);
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            });
+
+            function exportTierlist() {
+                const exportData = {
+                    category: currentCategory,
+                    tiers: {}
+                };
+
+                TIERS.forEach(tier => {
+                    exportData.tiers[tier] = tierData[tier].map(v => ({
+                        identifier: v.identifier,
+                        name: getVehicleName(v),
+                        br: getBR(v)
+                    }));
+                });
+
+                const dataStr = JSON.stringify(exportData, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `tierlist_${currentCategory}_${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                
+                URL.revokeObjectURL(url);
+            }
+
+            document.getElementById('importTierlistFile').addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        try {
+                            const importedData = JSON.parse(event.target.result);
+                            if (importedData.tiers) {
+                                tierData = { S: [], A: [], B: [], C: [], D: [] };
+                                
+                                Object.keys(importedData.tiers).forEach(tier => {
+                                    if (TIERS.includes(tier)) {
+                                        importedData.tiers[tier].forEach(v => {
+                                            const vehicle = allVehicles.find(av => av.identifier === v.identifier);
+                                            if (vehicle) {
+                                                tierData[tier].push(vehicle);
+                                            }
+                                        });
+                                    }
+                                });
+
+                                if (importedData.category && CATEGORIES[importedData.category]) {
+                                    currentCategory = importedData.category;
+                                    document.querySelectorAll('.category-btn').forEach(btn => {
+                                        btn.classList.toggle('active', btn.dataset.category === currentCategory);
+                                    });
+                                }
+
+                                TIERS.forEach(tier => renderTier(tier));
+                                renderVehicles();
+                                alert('Tierlist importée avec succès!');
+                            } else {
+                                alert('Format de fichier invalide');
                             }
                         } catch (err) {
                             alert('Erreur lors de l\'import: ' + err.message);
